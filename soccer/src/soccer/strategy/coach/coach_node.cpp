@@ -302,7 +302,7 @@ void CoachNode::assign_positions_normal(std::array<uint32_t, kNumShells>& positi
                     positions[robot_id] = Positions::Offense;
                     break;
                 default:
-                    positions[robot_id] = Positions::Defense;
+                    positions[robot_id] = Positions::Offense;
                     break;
             }
             assign_num++;

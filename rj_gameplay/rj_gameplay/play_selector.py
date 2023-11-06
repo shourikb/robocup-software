@@ -171,8 +171,8 @@ class PlaySelector(situation.IPlaySelector):
     """
 
     def __init__(self):
-        self.curr_situation = situations.Defense
-        self.curr_play = defense.Defense()
+        self.curr_situation = situations.Offense
+        self.curr_play = offense.Offense()
         self._midpoint_latency = None
 
     def select(

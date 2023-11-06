@@ -28,7 +28,7 @@ Offense::State Offense::update_state() {
 
     if (current_state_ == IDLING) {
         send_scorer_request();
-        next_state = SEARCHING;
+        next_state = PASSING;
     } else if (current_state_ == SEARCHING) {
         if (scorer_) {
             next_state = STEALING;

@@ -349,7 +349,8 @@ void AgentActionClient::get_communication() {
     }
 
     buffered_response.to_robot_ids = sent_robot_ids;
-    buffered_response.associated_request = communication_request.request;
+    communication::IncomingBallRequest ball_request = {6, static_cast<u_int8_t>(robot_id_)};
+    buffered_response.associated_request = ball_request;
     buffered_response.urgent = communication_request.urgent;
     buffered_response.created = RJ::now();
     buffered_responses_.push_back(buffered_response);
