@@ -33,6 +33,8 @@ public:
     void derived_pass_ball() override;
     void derived_acknowledge_ball_in_transit() override;
 
+    void revive() override;
+
 private:
     bool kicking_{true};
 
@@ -49,6 +51,7 @@ private:
         STEALING,        // attempting to intercept the ball from the other team
         FACING,          // turning to face the ball
         SCORER,          // overrides everything and will attempt to steal the bal and shoot it
+        AWAITING_SEND_PASS, //is waiting to send a pass to someone else
     };
 
     State update_state();
@@ -76,6 +79,7 @@ private:
      */
     communication::ScorerResponse receive_scorer_request(
         communication::ScorerRequest scorer_request);
+
 
     /**
      * @brief This agent can go through the distance of every other offensive robot from the goal

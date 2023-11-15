@@ -339,21 +339,23 @@ void AgentActionClient::get_communication() {
     } else {
         for (u_int8_t i : communication_request.target_agents) {
             if (i != robot_id_ && check_robot_alive(i)) {
+
                 robot_communication_cli_[i]->async_send_request(
                     request, [this, i](const std::shared_future<
                                        rj_msgs::srv::AgentCommunication::Response::SharedPtr>
-                                           response) { receive_response_callback(response, i); });
+                                           response) {
+                       receive_response_callback(response, i); });
                 sent_robot_ids.push_back(i);
             }
         }
     }
 
     buffered_response.to_robot_ids = sent_robot_ids;
-    communication::IncomingBallRequest ball_request = {6, static_cast<u_int8_t>(robot_id_)};
-    buffered_response.associated_request = ball_request;
     buffered_response.urgent = communication_request.urgent;
     buffered_response.created = RJ::now();
+    buffered_response.associated_request = communication_request.request;
     buffered_responses_.push_back(buffered_response);
+
 }
 
 void AgentActionClient::receive_communication_callback(
@@ -394,10 +396,11 @@ void AgentActionClient::receive_response_callback(
         rj_convert::convert_from_ros(response.get()->agent_response);
 
     for (u_int32_t i = 0; i < buffered_responses_.size(); i++) {
+
         if (buffered_responses_[i].associated_request == agent_response.associated_request) {
-            // add the robot id in the corresponding (increasing) location in the received_robot_ids
+
             if (buffered_responses_[i].received_robot_ids.empty()) {
-                buffered_responses_[i].received_robot_ids.push_back(robot_id);
+                buffered_responses_[i].received_robot_ids.push_back(robot_id);  
                 buffered_responses_[i].responses.push_back(agent_response.response);
             } else {
                 for (u_int32_t j = 0; j < buffered_responses_[i].received_robot_ids.size(); j++) {

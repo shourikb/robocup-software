@@ -27,8 +27,8 @@ Offense::State Offense::update_state() {
     double distance_to_ball = robot_position.dist_to(ball_position);
 
     if (current_state_ == IDLING) {
-        send_scorer_request();
-        next_state = PASSING;
+        // send_scorer_request();
+        next_state = AWAITING_SEND_PASS;
     } else if (current_state_ == SEARCHING) {
         if (scorer_) {
             next_state = STEALING;
@@ -75,6 +75,10 @@ Offense::State Offense::update_state() {
         if (check_is_done()) {
             next_state = IDLING;
         }
+    } else if (current_state_ == AWAITING_SEND_PASS) {
+        if (distance_to_ball < ball_lost_distance_){
+            Position::broadcast_direct_pass_request();
+        }
     }
 
     return next_state;
@@ -92,7 +96,10 @@ std::optional<RobotIntent> Offense::state_to_task(RobotIntent intent) {
         intent.motion_command = empty_motion_cmd;
         return intent;
     } else if (current_state_ == PASSING) {
+        // SPDLOG_INFO("Target Pass ID: {}", target_robot_id);
         // attempt to pass the ball to the target robot
+        SPDLOG_INFO("I am {} and I am passing to {}", robot_id_, target_robot_id);
+
         rj_geometry::Point target_robot_pos =
             world_state()->get_robot(true, target_robot_id).pose.position();
         planning::LinearMotionInstant target{target_robot_pos};
@@ -171,6 +178,10 @@ std::optional<RobotIntent> Offense::state_to_task(RobotIntent intent) {
         auto face_ball_cmd =
             planning::MotionCommand{"path_target", current_location_instant, face_ball};
         intent.motion_command = face_ball_cmd;
+        return intent;
+    } else if (current_state_ == AWAITING_SEND_PASS) {
+        auto empty_motion_cmd = planning::MotionCommand{};
+        intent.motion_command = empty_motion_cmd;
         return intent;
     }
 
@@ -303,5 +314,8 @@ void Offense::derived_acknowledge_ball_in_transit() {
     current_state_ = RECEIVING;
     chasing_ball = false;
 }
+
+void Offense::revive() { current_state_ = AWAITING_SEND_PASS; }
+
 
 }  // namespace strategy

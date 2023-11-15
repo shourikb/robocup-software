@@ -75,6 +75,7 @@ rosidl_generate_interfaces(
   # Agent Response Messages
   response/Acknowledge.msg
   response/PassResponse.msg
+  response/AcceptDirectPassResponse.msg
   response/PositionResponse.msg
   response/TestResponse.msg
   response/ScorerResponse.msg

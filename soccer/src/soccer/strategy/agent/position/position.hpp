@@ -129,6 +129,8 @@ public:
      */
     void send_direct_pass_request(std::vector<u_int8_t> target_robots);
 
+    void broadcast_direct_pass_request();
+
     /**
      * @brief receives and handles a pass_request
      *
@@ -256,7 +258,7 @@ protected:
     const int robot_id_;
 
     // the robot our robot is going to be passing to
-    int target_robot_id;
+    int target_robot_id = 10;
 
     // the robot our robot will be facing (useful for passing)
     int face_robot_id;

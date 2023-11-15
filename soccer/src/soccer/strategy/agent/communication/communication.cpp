@@ -52,6 +52,10 @@ bool operator==(const PassResponse& a, const PassResponse& b) {
     return a.response_uid == b.response_uid;
 }
 
+bool operator==(const AcceptDirectPassResponse& a, const AcceptDirectPassResponse& b) {
+    return a.response_uid == b.response_uid;
+}
+
 bool operator==(const PositionResponse& a, const PositionResponse& b) {
     return a.response_uid == b.response_uid;
 }
@@ -147,6 +151,13 @@ void generate_uid(Acknowledge& response) {
 }
 
 void generate_uid(PassResponse& response) {
+    response_uid_mutex.lock();
+    response.response_uid = response_uid;
+    response_uid++;
+    response_uid_mutex.unlock();
+}
+
+void generate_uid(AcceptDirectPassResponse& response) {
     response_uid_mutex.lock();
     response.response_uid = response_uid;
     response_uid++;
