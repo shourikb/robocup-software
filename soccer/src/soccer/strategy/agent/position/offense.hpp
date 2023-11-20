@@ -64,6 +64,8 @@ private:
     bool scorer_ = false;
     bool last_scorer_ = false;
 
+    communication::PassResponse receive_pass_request(communication::PassRequest pass_request);
+
     /**
      * @brief Send request to the other robots to see if this robot should be the scorer
      *

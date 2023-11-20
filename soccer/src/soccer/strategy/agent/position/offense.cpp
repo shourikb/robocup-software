@@ -214,9 +214,46 @@ communication::PosAgentResponseWrapper Offense::receive_communication_request(
                    std::get_if<communication::ResetScorerRequest>(&request.request)) {
         communication::Acknowledge response = receive_reset_scorer_request();
         comm_response.response = response;
+    } else if (const communication::PassRequest* pass_request =
+                   std::get_if<communication::PassRequest>(&request.request)) {
+        rj_geometry::Point robot_position = world_state()->get_robot(true, robot_id_).pose.position();
+        rj_geometry::Point from_robot_position = world_state()->get_robot(true, pass_request->from_robot_id).pose.position();
+        rj_geometry::Segment pass_path{from_robot_position, robot_position};
+        double min_robot_dist = 10000;
+        float min_path_dist = 10000;
+        for (auto bot : world_state()->their_robots) {
+            rj_geometry::Point opp_pos = bot.pose.position();
+            min_robot_dist = std::min(min_robot_dist, robot_position.dist_to(opp_pos));
+            min_path_dist = std::min(min_path_dist, pass_path.dist_to(opp_pos));
+        }
+
+        SPDLOG_INFO("I am {} and my min_robot_dist is {} and my min_path_dist is {}", robot_id_, min_robot_dist, min_path_dist);
+
+
+        if (min_robot_dist > max_receive_distance && min_path_dist > max_receive_distance) {
+            communication::PassResponse response = receive_pass_request(*pass_request);
+            comm_response.response = response;
+        }
     }
 
     return comm_response;
+}
+
+communication::PassResponse Offense::receive_pass_request(
+    communication::PassRequest pass_request) {
+    communication::PassResponse pass_response{};
+    communication::generate_uid(pass_response);
+
+    if (pass_request.direct) {
+        // Handle direct pass request
+        // TODO: Make this rely on actually being open
+        pass_response.direct_open = true;
+    } else {
+        // TODO: Handle indirect pass request
+        pass_response.direct_open = false;
+    }
+
+    return pass_response;
 }
 
 void Offense::send_scorer_request() {

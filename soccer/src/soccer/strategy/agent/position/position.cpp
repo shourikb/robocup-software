@@ -127,11 +127,11 @@ void Position::receive_communication_response(communication::AgentPosResponseWra
 communication::PosAgentResponseWrapper Position::receive_communication_request(
     communication::AgentPosRequestWrapper request) {
     communication::PosAgentResponseWrapper comm_response{};
-    if (const communication::PassRequest* pass_request =
-            std::get_if<communication::PassRequest>(&request.request)) {
-        communication::PassResponse pass_response = receive_pass_request(*pass_request);
-        comm_response.response = pass_response;
-    } else if (const communication::IncomingBallRequest* incoming_ball_request =
+    // if (const communication::PassRequest* pass_request =
+    //         std::get_if<communication::PassRequest>(&request.request)) {
+    //     communication::PassResponse pass_response = receive_pass_request(*pass_request);
+    //     comm_response.response = pass_response;
+    if (const communication::IncomingBallRequest* incoming_ball_request =
                    std::get_if<communication::IncomingBallRequest>(&request.request)) {
         communication::Acknowledge incoming_pass_acknowledge =
             acknowledge_pass(*incoming_ball_request);
