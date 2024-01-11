@@ -19,7 +19,6 @@
 #include "rj_msgs/msg/leave_wall_response.hpp"
 #include "rj_msgs/msg/pass_request.hpp"
 #include "rj_msgs/msg/pass_response.hpp"
-#include "rj_msgs/msg/accept_direct_pass_response.hpp"
 #include "rj_msgs/msg/position_request.hpp"
 #include "rj_msgs/msg/position_response.hpp"
 #include "rj_msgs/msg/reset_scorer_request.hpp"
@@ -169,14 +168,6 @@ struct Acknowledge {
 };
 bool operator==(const Acknowledge& a, const Acknowledge& b);
 
-
-struct AcceptDirectPassResponse {
-    u_int32_t response_uid;
-    u_int8_t robot_id;
-};
-bool operator==(const AcceptDirectPassResponse& a, const AcceptDirectPassResponse& b);
-
-
 /**
  * @brief response from an open agent that will let the sender know that the
  * receiver is open for a pass.
@@ -259,7 +250,7 @@ bool operator==(const LeaveWallResponse& a, const LeaveWallResponse& b);
  *
  */
 using AgentResponseVariant = std::variant<Acknowledge, PassResponse, PositionResponse, TestResponse,
-                                          JoinWallResponse, LeaveWallResponse, ScorerResponse, AcceptDirectPassResponse>;
+                                          JoinWallResponse, LeaveWallResponse, ScorerResponse>;
 
 /**
  * @brief response message that is sent from the receiver of the request to the
@@ -349,7 +340,6 @@ void generate_uid(LeaveWallRequest& request);
 
 void generate_uid(Acknowledge& response);
 void generate_uid(PassResponse& response);
-void generate_uid(AcceptDirectPassResponse& response);
 void generate_uid(PositionResponse& response);
 void generate_uid(TestResponse& response);
 void generate_uid(ScorerResponse& response);
@@ -635,25 +625,6 @@ struct RosConverter<strategy::communication::PassResponse, rj_msgs::msg::PassRes
 ASSOCIATE_CPP_ROS(strategy::communication::PassResponse, rj_msgs::msg::PassResponse);
 
 template <>
-struct RosConverter<strategy::communication::AcceptDirectPassResponse, rj_msgs::msg::AcceptDirectPassResponse> {
-    static rj_msgs::msg::AcceptDirectPassResponse to_ros(const strategy::communication::AcceptDirectPassResponse& from) {
-        rj_msgs::msg::AcceptDirectPassResponse result;
-        result.response_uid = from.response_uid;
-        result.robot_id = from.robot_id;
-        return result;
-    }
-
-    static strategy::communication::AcceptDirectPassResponse from_ros(const rj_msgs::msg::AcceptDirectPassResponse& from) {
-        strategy::communication::AcceptDirectPassResponse result{};
-        result.response_uid = from.response_uid;
-        result.robot_id = from.robot_id;
-        return result;
-    }
-};
-
-ASSOCIATE_CPP_ROS(strategy::communication::AcceptDirectPassResponse, rj_msgs::msg::AcceptDirectPassResponse);
-
-template <>
 struct RosConverter<strategy::communication::PositionResponse, rj_msgs::msg::PositionResponse> {
     static rj_msgs::msg::PositionResponse to_ros(
         const strategy::communication::PositionResponse& from) {
@@ -768,9 +739,6 @@ struct RosConverter<strategy::communication::AgentResponse, rj_msgs::msg::AgentR
         } else if (const auto* pass_response =
                        std::get_if<strategy::communication::PassResponse>(&(from.response))) {
             result.response.pass_response.emplace_back(convert_to_ros(*pass_response));
-        } else if (const auto* direct_pass_response =
-                       std::get_if<strategy::communication::AcceptDirectPassResponse>(&(from.response))) {
-            result.response.accept_direct_pass_response.emplace_back(convert_to_ros(*direct_pass_response));
         } else if (const auto* scorer_response =
                        std::get_if<strategy::communication::ScorerResponse>(&(from.response))) {
             result.response.scorer_response.emplace_back(convert_to_ros(*scorer_response));
@@ -798,8 +766,6 @@ struct RosConverter<strategy::communication::AgentResponse, rj_msgs::msg::AgentR
             result.response = convert_from_ros(from.response.position_response.front());
         } else if (!from.response.pass_response.empty()) {
             result.response = convert_from_ros(from.response.pass_response.front());
-        } else if (!from.response.accept_direct_pass_response.empty()) {
-            result.response = convert_from_ros(from.response.accept_direct_pass_response.front());
         } else if (!from.response.scorer_response.empty()) {
             result.response = convert_from_ros(from.response.scorer_response.front());
         } else if (!from.response.join_wall_response.empty()) {

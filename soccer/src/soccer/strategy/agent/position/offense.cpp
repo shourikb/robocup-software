@@ -96,10 +96,6 @@ std::optional<RobotIntent> Offense::state_to_task(RobotIntent intent) {
         intent.motion_command = empty_motion_cmd;
         return intent;
     } else if (current_state_ == PASSING) {
-        // SPDLOG_INFO("Target Pass ID: {}", target_robot_id);
-        // attempt to pass the ball to the target robot
-        SPDLOG_INFO("I am {} and I am passing to {}", robot_id_, target_robot_id);
-
         rj_geometry::Point target_robot_pos =
             world_state()->get_robot(true, target_robot_id).pose.position();
         planning::LinearMotionInstant target{target_robot_pos};
@@ -227,9 +223,6 @@ communication::PosAgentResponseWrapper Offense::receive_communication_request(
             min_path_dist = std::min(min_path_dist, pass_path.dist_to(opp_pos));
         }
 
-        SPDLOG_INFO("I am {} and my min_robot_dist is {} and my min_path_dist is {}", robot_id_, min_robot_dist, min_path_dist);
-
-
         if (min_robot_dist > max_receive_distance && min_path_dist > max_receive_distance) {
             communication::PassResponse response = receive_pass_request(*pass_request);
             comm_response.response = response;
@@ -246,7 +239,6 @@ communication::PassResponse Offense::receive_pass_request(
 
     if (pass_request.direct) {
         // Handle direct pass request
-        // TODO: Make this rely on actually being open
         pass_response.direct_open = true;
     } else {
         // TODO: Handle indirect pass request
@@ -351,8 +343,5 @@ void Offense::derived_acknowledge_ball_in_transit() {
     current_state_ = RECEIVING;
     chasing_ball = false;
 }
-
-void Offense::revive() { current_state_ = AWAITING_SEND_PASS; }
-
 
 }  // namespace strategy

@@ -33,8 +33,6 @@ public:
     void derived_pass_ball() override;
     void derived_acknowledge_ball_in_transit() override;
 
-    void revive() override;
-
 private:
     bool kicking_{true};
 
