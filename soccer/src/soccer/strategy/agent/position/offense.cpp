@@ -13,6 +13,7 @@ std::optional<RobotIntent> Offense::derived_get_task(RobotIntent intent) {
 }
 
 Offense::State Offense::update_state() {
+    // SPDLOG_INFO("I am {}, my state is {}", robot_id_, current_state_);
     State next_state = current_state_;
     // handle transitions between current state
     WorldState* world_state = this->world_state();
@@ -28,7 +29,11 @@ Offense::State Offense::update_state() {
 
     if (current_state_ == IDLING) {
         // send_scorer_request();
-        next_state = AWAITING_SEND_PASS;
+        if (robot_id_ == 4) {
+            next_state = AWAITING_SEND_PASS;
+        } else {
+            next_state = SEEKING;
+        }
     } else if (current_state_ == SEARCHING) {
         if (scorer_) {
             next_state = STEALING;
@@ -56,7 +61,7 @@ Offense::State Offense::update_state() {
         }
     } else if (current_state_ == RECEIVING) {
         // transition to idling if we are close enough to the ball
-        if (distance_to_ball < ball_receive_distance_) {
+        if (distance_to_ball < 2*ball_receive_distance_) {
             next_state = IDLING;
         }
     } else if (current_state_ == STEALING) {
@@ -76,9 +81,13 @@ Offense::State Offense::update_state() {
             next_state = IDLING;
         }
     } else if (current_state_ == AWAITING_SEND_PASS) {
-        if (distance_to_ball < ball_lost_distance_){
+        auto cur = std::chrono::high_resolution_clock::now();
+        auto diff = cur - start;
+        if (distance_to_ball < ball_lost_distance_ && diff.count() > 0.2){
             Position::broadcast_direct_pass_request();
+            start = std::chrono::high_resolution_clock::now();
         }
+    } else if (current_state_ ==  SEEKING) {
     }
 
     return next_state;
@@ -179,10 +188,181 @@ std::optional<RobotIntent> Offense::state_to_task(RobotIntent intent) {
         auto empty_motion_cmd = planning::MotionCommand{};
         intent.motion_command = empty_motion_cmd;
         return intent;
+    } else if (current_state_ == SEEKING) {
+        rj_geometry::Point current_loc = world_state()->get_robot(true, robot_id_).pose.position(); 
+        rj_geometry::Point curr_target = intent.motion_command.target.position;
+        if (check_is_done() || target_pt == rj_geometry::Point{0, 0}) {
+            target_pt = get_open_point(world_state(), current_loc, field_dimensions_);
+        }
+        planning::PathTargetFaceOption face_option = planning::FaceBall{};
+        bool ignore_ball = false;
+        // SPDLOG_INFO("Robot ID: {}, Target Pt: ({}, {})", robot_id_, target_pt.x(), target_pt.y());
+        planning::LinearMotionInstant goal{target_pt, rj_geometry::Point{0.0, 0.0}};
+        intent.motion_command = planning::MotionCommand{"path_target", goal, face_option, ignore_ball};
+        return intent;
     }
 
     // should be impossible to reach, but this is an EmptyMotionCommand
     return std::nullopt;
+}
+
+rj_geometry::Point Offense::get_open_point(const WorldState* world_state,
+                                          rj_geometry::Point current_loc,
+                                          FieldDimensions field_dimensions) {
+    return Offense::calculate_open_point(3.0, .2, current_loc, world_state, field_dimensions);
+}
+
+rj_geometry::Point Offense::calculate_open_point(double current_prec, double min_prec,
+                                                rj_geometry::Point current_point,
+                                                const WorldState* world_state,
+                                                FieldDimensions field_dimensions) {
+    while (current_prec > min_prec) {
+        rj_geometry::Point ball_pos = world_state->ball.position;
+        rj_geometry::Point min = current_point;
+        double min_val = max_los(ball_pos, current_point, world_state);
+        double curr_val{};
+        // Points in a current_prec radius of the current point, at 45 degree intervals
+        std::vector<rj_geometry::Point> check_points{
+            correct_point(current_point + rj_geometry::Point{current_prec, 0}, field_dimensions),
+            correct_point(current_point + rj_geometry::Point{-current_prec, 0}, field_dimensions),
+            correct_point(current_point + rj_geometry::Point{0, current_prec}, field_dimensions),
+            correct_point(current_point + rj_geometry::Point{0, -current_prec}, field_dimensions),
+            correct_point(
+                current_point + rj_geometry::Point{current_prec * 0.707, current_prec * 0.707},
+                field_dimensions),
+            correct_point(
+                current_point + rj_geometry::Point{current_prec * 0.707, -current_prec * 0.707},
+                field_dimensions),
+            correct_point(
+                current_point + rj_geometry::Point{-current_prec * 0.707, current_prec * 0.707},
+                field_dimensions),
+            correct_point(
+                current_point + rj_geometry::Point{-current_prec * 0.707, -current_prec * 0.707},
+                field_dimensions)};
+
+        for (auto point : check_points) {
+            curr_val = max_los(ball_pos, point, world_state);
+            if (curr_val < min_val) {
+                min_val = curr_val;
+                min = point;
+            }
+        }
+        current_prec *= 0.5;
+        current_point = min;
+    }
+    return current_point;
+}
+
+rj_geometry::Point Offense::random_noise(double prec) {
+    double x = (double)rand() / RAND_MAX * prec;
+    double y = (double)rand() / RAND_MAX * prec;
+    return rj_geometry::Point{x, y};
+}
+
+rj_geometry::Point Offense::correct_point(rj_geometry::Point p, FieldDimensions field_dimensions) {
+    double BORDER_BUFFER = .2;
+    double x = p.x();
+    double y = p.y();
+
+    // X Border
+    if (p.x() > field_dimensions.field_x_right_coord() - BORDER_BUFFER) {
+        x = field_dimensions.field_x_right_coord() - BORDER_BUFFER;
+    } else if (p.x() < field_dimensions.field_x_left_coord() + BORDER_BUFFER) {
+        x = field_dimensions.field_x_left_coord() + BORDER_BUFFER;
+    }
+
+    // Y Border
+    if (p.y() > field_dimensions.their_goal_loc().y() - BORDER_BUFFER) {
+        y = field_dimensions.their_goal_loc().y() - BORDER_BUFFER;
+    } else if (p.y() < field_dimensions.our_goal_loc().y() + BORDER_BUFFER) {
+        y = field_dimensions.our_goal_loc().y() + BORDER_BUFFER;
+    }
+
+    // Goalie Boxes
+    if ((y < 1.2 || y > 7.8) && fabs(x) < 1.2) {
+        if (y > 4.5) {
+            y = 8.0 - BORDER_BUFFER;
+        } else {
+            y = 1.0 + BORDER_BUFFER;
+        }
+
+        if (x > .5) {
+            x = 1.0 + BORDER_BUFFER;
+        } else {
+            x = -1.0 - BORDER_BUFFER;
+        }
+    }
+
+    // Assigns robots to horizontal thirds
+    if (robot_id_ == 1) {
+        // Assign left
+        if (x > field_dimensions.field_x_left_coord() + field_dimensions.width() / 2) {
+            x = field_dimensions.field_x_left_coord() + field_dimensions.width() / 2 -
+                BORDER_BUFFER;
+        }
+    } else if (robot_id_ == 2) {
+        // Assign right
+        if (x < field_dimensions.field_x_right_coord() - field_dimensions.width() / 2) {
+            x = field_dimensions.field_x_right_coord() - field_dimensions.width() / 2 +
+                BORDER_BUFFER;
+        }
+    } else {
+        // Assign middle
+        if (x < field_dimensions.field_x_left_coord() + field_dimensions.width() / 3) {
+            x = field_dimensions.field_x_left_coord() + field_dimensions.width() / 3 +
+                BORDER_BUFFER;
+        } else if (x > field_dimensions.field_x_right_coord() - field_dimensions.width() / 3) {
+            x = field_dimensions.field_x_right_coord() - field_dimensions.width() / 3 -
+                BORDER_BUFFER;
+        }
+    }
+
+    return rj_geometry::Point(x, y);
+}
+
+double Offense::max_los(rj_geometry::Point ball_pos, rj_geometry::Point current_point,
+                       const WorldState* world_state) {
+
+
+    rj_geometry::Rect goal_box{rj_geometry::Point{1, 8}, rj_geometry::Point{-1, 9}};
+    if (goal_box.contains_point(current_point)) {
+        return 10000000;
+    }
+
+    double max = 0;
+    double curr_dp;
+    for (auto robot : world_state->their_robots) {
+        curr_dp = (current_point).norm().dot((robot.pose.position() - ball_pos).norm());
+        curr_dp *= curr_dp;
+        if (curr_dp > max) {
+            max = curr_dp;
+        }
+    }
+
+    rj_geometry::Segment pass_path{ball_pos, current_point};
+    double min_robot_dist = 10000;
+    float min_path_dist = 10000;
+    for (auto bot : world_state->their_robots) {
+        rj_geometry::Point opp_pos = bot.pose.position();
+        min_robot_dist = std::min(min_robot_dist, current_point.dist_to(opp_pos));
+        min_path_dist = std::min(min_path_dist, pass_path.dist_to(opp_pos));
+    }
+    min_path_dist *= 0.02;
+    min_robot_dist *= 0.005;
+
+    for (auto robot : world_state->our_robots) {
+        curr_dp = (current_point - ball_pos).norm().dot((robot.pose.position() - ball_pos).norm());
+        curr_dp *= curr_dp;
+        if (curr_dp > max) {
+            max = curr_dp;
+        }
+    }
+
+    // Additional heuristics for calculating optimal point
+    double ball_proximity_loss = (current_point - ball_pos).mag() * .002;
+    double goal_distance_loss = (9.0 - current_point.y()) * .008;
+
+    return max + ball_proximity_loss + goal_distance_loss + min_path_dist + min_robot_dist;
 }
 
 void Offense::receive_communication_response(communication::AgentPosResponseWrapper response) {
@@ -212,20 +392,23 @@ communication::PosAgentResponseWrapper Offense::receive_communication_request(
         comm_response.response = response;
     } else if (const communication::PassRequest* pass_request =
                    std::get_if<communication::PassRequest>(&request.request)) {
-        rj_geometry::Point robot_position = world_state()->get_robot(true, robot_id_).pose.position();
-        rj_geometry::Point from_robot_position = world_state()->get_robot(true, pass_request->from_robot_id).pose.position();
-        rj_geometry::Segment pass_path{from_robot_position, robot_position};
-        double min_robot_dist = 10000;
-        float min_path_dist = 10000;
-        for (auto bot : world_state()->their_robots) {
-            rj_geometry::Point opp_pos = bot.pose.position();
-            min_robot_dist = std::min(min_robot_dist, robot_position.dist_to(opp_pos));
-            min_path_dist = std::min(min_path_dist, pass_path.dist_to(opp_pos));
-        }
+        if (check_is_done()) {
+            rj_geometry::Point robot_position = world_state()->get_robot(true, robot_id_).pose.position();
+            rj_geometry::Point from_robot_position = world_state()->get_robot(true, pass_request->from_robot_id).pose.position();
+            rj_geometry::Segment pass_path{from_robot_position, robot_position};
+            double min_robot_dist = 10000;
+            float min_path_dist = 10000;
+            for (auto bot : world_state()->their_robots) {
+                rj_geometry::Point opp_pos = bot.pose.position();
+                min_robot_dist = std::min(min_robot_dist, robot_position.dist_to(opp_pos));
+                min_path_dist = std::min(min_path_dist, pass_path.dist_to(opp_pos));
+            }
+            // SPDLOG_INFO("I am {}, recieving ocmm request", robot_id_);
 
-        if (min_robot_dist > max_receive_distance && min_path_dist > max_receive_distance) {
-            communication::PassResponse response = receive_pass_request(*pass_request);
-            comm_response.response = response;
+            if (min_robot_dist > max_receive_distance && min_path_dist > max_receive_distance) {
+                communication::PassResponse response = receive_pass_request(*pass_request);
+                comm_response.response = response;
+            }
         }
     }
 
