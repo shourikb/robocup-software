@@ -88,7 +88,12 @@ Offense::State Offense::update_state() {
             start = std::chrono::high_resolution_clock::now();
         }
     } else if (current_state_ ==  SEEKING) {
+        // if the ball comes close to it while it's trying to seek, it should no longer be trying to seek
+        if (distance_to_ball < ball_receive_distance_) {
+            next_state = AWAITING_SEND_PASS;
+        }
     }
+    
 
     return next_state;
 }
@@ -406,7 +411,7 @@ communication::PosAgentResponseWrapper Offense::receive_communication_request(
             // SPDLOG_INFO("I am {}, recieving ocmm request", robot_id_);
 
             if (min_robot_dist > max_receive_distance && min_path_dist > max_receive_distance) {
-                communication::PassResponse response = receive_pass_request(*pass_request);
+                communication::PassResponse response = Position::receive_pass_request(*pass_request);
                 comm_response.response = response;
             }
         }
@@ -415,21 +420,21 @@ communication::PosAgentResponseWrapper Offense::receive_communication_request(
     return comm_response;
 }
 
-communication::PassResponse Offense::receive_pass_request(
-    communication::PassRequest pass_request) {
-    communication::PassResponse pass_response{};
-    communication::generate_uid(pass_response);
+// communication::PassResponse Offense::receive_pass_request(
+//     communication::PassRequest pass_request) {
+//     communication::PassResponse pass_response{};
+//     communication::generate_uid(pass_response);
 
-    if (pass_request.direct) {
-        // Handle direct pass request
-        pass_response.direct_open = true;
-    } else {
-        // TODO: Handle indirect pass request
-        pass_response.direct_open = false;
-    }
+//     if (pass_request.direct) {
+//         // Handle direct pass request
+//         pass_response.direct_open = true;
+//     } else {
+//         // TODO: Handle indirect pass request
+//         pass_response.direct_open = false;
+//     }
 
-    return pass_response;
-}
+//     return pass_response;
+// }
 
 void Offense::send_scorer_request() {
     communication::ScorerRequest scorer_request{};

@@ -65,7 +65,7 @@ private:
     bool scorer_ = false;
     bool last_scorer_ = false;
 
-    communication::PassResponse receive_pass_request(communication::PassRequest pass_request);
+    // communication::PassResponse receive_pass_request(communication::PassRequest pass_request);
 
     rj_geometry::Point get_open_point(const WorldState* world_state, rj_geometry::Point current_position,
         FieldDimensions field_dimensions);
