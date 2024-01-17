@@ -90,7 +90,7 @@ Offense::State Offense::update_state() {
     } else if (current_state_ ==  SEEKING) {
         // if the ball comes close to it while it's trying to seek, it should no longer be trying to seek
         if (distance_to_ball < ball_receive_distance_) {
-            next_state = AWAITING_SEND_PASS;
+            // next_state = IDLING;
         }
     }
     
